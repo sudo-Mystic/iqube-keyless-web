@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e14">
+<title>iQube Keyless</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0b0e14; color: #e8ecf1; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 20px 16px 32px;
+  }
+  .wrap { width: 100%; max-width: 480px; }
+  h1 { font-size: 22px; margin: 8px 0 2px; letter-spacing: .2px; }
+  .sub { color: #8b93a3; font-size: 13px; margin-bottom: 16px; }
+  .status {
+    display: flex; align-items: center; gap: 8px;
+    background: #141926; border: 1px solid #232b3d; border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 16px; font-size: 14px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #5b6474; flex: none; }
+  .dot.on { background: #34d17b; box-shadow: 0 0 8px #34d17b88; }
+  .dot.busy { background: #f5b544; box-shadow: 0 0 8px #f5b54488; }
+  #statusText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn {
+    display: block; width: 100%; border: 0; border-radius: 14px;
+    padding: 16px; margin: 0 0 12px; font-size: 17px; font-weight: 700;
+    color: #0b0e14; background: #e8ecf1; cursor: pointer;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .35; cursor: default; transform: none; }
+  .btn.primary { background: #4da3ff; color: #06121f; }
+  .btn.danger { background: #ff6b6b; color: #2b0a0a; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+  .grid .btn { margin-bottom: 0; }
+  .loghead { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 8px; }
+  .loghead span { font-size: 13px; color: #8b93a3; font-weight: 600; }
+  .loghead button {
+    background: none; border: 1px solid #2a3348; color: #8b93a3; border-radius: 8px;
+    font-size: 12px; padding: 6px 10px; cursor: pointer;
+  }
+  #log {
+    background: #070a10; border: 1px solid #1d2433; border-radius: 12px;
+    height: 260px; overflow-y: auto; padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.55;
+  }
+  #log .tx { color: #7fd6a4; } #log .rx { color: #8fc3ff; }
+  #log .err { color: #ff8f8f; } #log .inf { color: #9aa3b5; }
+  .note { margin-top: 16px; font-size: 12px; color: #6b7488; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>iQube Keyless</h1>
+  <div class="sub">Real Bluetooth keyless entry for your TVS iQube. Chrome or Edge on Android.</div>
+
+  <div class="status"><div class="dot" id="dot"></div><div id="statusText">Not connected</div></div>
+
+  <button class="btn primary" id="connectBtn">Connect scooter</button>
+
+  <div class="grid">
+    <button class="btn" id="lockBtn" disabled>Lock</button>
+    <button class="btn" id="unlockBtn" disabled>Unlock</button>
+    <button class="btn" id="trunkBtn" disabled>Trunk</button>
+    <button class="btn" id="findBtn" disabled>Find</button>
+  </div>
+
+  <div class="loghead"><span>PACKET LOG</span><button id="clearBtn">Clear</button></div>
+  <div id="log"></div>
+
+  <div class="note">
+    Stand within a few meters of the scooter with its Bluetooth on. If the phone asks
+    to pair, accept it. Buttons enable after the keyless service is found.
+    Everything stays between your phone and the scooter. No account, no servers.
+  </div>
+</div>
+
+<script>
+"use strict";
+/* iQube BLE keyless-entry client. Protocol replicated from the official TVS app. */
+
+const SERVICE_UUID = "5456534d-5647-5341-5342-454e544f5251";
+const WRITE_CHAR_UUID = "00005352-0000-1000-8000-00805f9b34fb";
+const NOTIFY_CHAR_UUID = "00005354-0000-1000-8000-00805f9b34fb";
+
+function uuidBytes(s) {
+  const hex = s.replace(/-/g, "");
+  const out = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+const CMD = {
+  lock:  uuidBytes("1cf04025-1705-5b19-00d1-bce762b1c5da"),
+  unlock: uuidBytes("3a7c269a-16db-57f5-426f-7a338538feac"),
+  trunk: uuidBytes("50b2c932-9b88-21cb-8c61-3b96cbecf872"),
+  find:  uuidBytes("5f1f748a-6557-94d2-6e26-ef49fca68f3c"),
+};
+const KEY_BYTES = new Uint8Array([122,163,32,77,22,29,181,37,244,235,32,79,188,215,61,212]);
+
+const FRAME_SIZE = 20;
+const CMD_BYTE_KEYLESS = 0x40;
+const CMD_BYTE_CHALLENGE = 0x50;
+
+let device = null, server = null, writeChar = null, aesKey = null;
+let writeQueue = Promise.resolve();
+
+const $ = id => document.getElementById(id);
+const dot = $("dot"), statusText = $("statusText"), logEl = $("log");
+
+function setStatus(mode, text) {
+  dot.className = "dot" + (mode ? " " + mode : "");
+  statusText.textContent = text;
+}
+function log(cls, msg) {
+  const line = document.createElement("div");
+  line.className = cls;
+  const t = new Date().toLocaleTimeString("en-GB", { hour12: false });
+  line.textContent = t + "  " + msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function hex(bytes) {
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+function setButtons(enabled) {
+  for (const id of ["lockBtn", "unlockBtn", "trunkBtn", "findBtn"]) $(id).disabled = !enabled;
+}
+$("clearBtn").onclick = () => { logEl.innerHTML = ""; };
+
+/* 20-byte command frame: [0x9A,0xF1,rand,len,0x00,cmdByte,slice,0xFF,zero-pad] */
+function buildFrame(command, cmdByte) {
+  const rnd = new Uint8Array(2);
+  crypto.getRandomValues(rnd);
+  const rand = 1 + (rnd[0] % 15);                    // [1,15]
+  const lenMax = Math.min(16 - rand, 12);
+  const len = lenMax <= 1 ? 1 : 1 + (rnd[1] % (lenMax - 1)); // [1,lenMax)
+  const frame = new Uint8Array(FRAME_SIZE);
+  frame[0] = 0x9A; frame[1] = 0xF1;
+  frame[2] = rand; frame[3] = len;
+  frame[4] = 0x00; frame[5] = cmdByte;
+  frame.set(command.subarray(rand, rand + len), 6);
+  frame[6 + len] = 0xFF;
+  return frame;
+}
+
+async function getAesKey() {
+  if (!aesKey) {
+    aesKey = await crypto.subtle.importKey("raw", KEY_BYTES, { name: "AES-CTR" }, false, ["encrypt"]);
+  }
+  return aesKey;
+}
+/* AES-CTR, IV = challenge bytes, plaintext = challenge bytes (matches the app). */
+async function cipherChallenge(challenge) {
+  const key = await getAesKey();
+  const out = await crypto.subtle.encrypt(
+    { name: "AES-CTR", counter: challenge.slice(0, 16), length: 128 },
+    key, challenge.slice(0, 16)
+  );
+  return new Uint8Array(out);
+}
+
+function queueWrite(frame, label) {
+  writeQueue = writeQueue.then(async () => {
+    log("tx", "TX " + label + " " + hex(frame));
+    await writeChar.writeValue(frame);
+    log("inf", label + " sent");
+  }).catch(e => log("err", "Write failed (" + label + "): " + e.message));
+  return writeQueue;
+}
+
+function onNotification(event) {
+  const data = new Uint8Array(event.target.value.buffer);
+  log("rx", "RX " + data.length + " bytes: " + hex(data));
+  if (data.length >= 16 && writeChar) {
+    const challenge = data.slice(0, 16);
+    log("inf", "Challenge received, answering...");
+    cipherChallenge(challenge).then(enc => {
+      queueWrite(buildFrame(enc, CMD_BYTE_CHALLENGE), "CHALLENGE-RESP");
+    }).catch(e => log("err", "Challenge encrypt failed: " + e.message));
+  }
+}
+
+function onDisconnected() {
+  log("err", "Disconnected");
+  setStatus("", "Not connected");
+  setButtons(false);
+  $("connectBtn").textContent = "Connect scooter";
+  device = null; server = null; writeChar = null;
+  writeQueue = Promise.resolve();
+}
+
+$("connectBtn").onclick = async () => {
+  if (device && device.gatt.connected) { device.gatt.disconnect(); return; }
+  if (!("bluetooth" in navigator)) {
+    log("err", "Web Bluetooth not available. Use Chrome or Edge on Android.");
+    return;
+  }
+  try {
+    const avail = await navigator.bluetooth.getAvailability().catch(() => true);
+    if (!avail) log("inf", "Bluetooth radio reports unavailable. Turn Bluetooth on.");
+  } catch (e) { /* ignore */ }
+
+  setStatus("busy", "Pick your scooter...");
+  log("inf", "Requesting Bluetooth device...");
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [SERVICE_UUID],
+    });
+  } catch (e) {
+    setStatus("", "Not connected");
+    log("err", "Device picker cancelled or failed: " + e.message);
+    return;
+  }
+
+  const name = device.name || device.id;
+  device.addEventListener("gattserverdisconnected", onDisconnected);
+  setStatus("busy", "Connecting to " + name + "...");
+  log("inf", "Connecting to " + name + "...");
+  try {
+    server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    writeChar = await service.getCharacteristic(WRITE_CHAR_UUID);
+    const notifyChar = await service.getCharacteristic(NOTIFY_CHAR_UUID);
+    await notifyChar.startNotifications();
+    notifyChar.addEventListener("characteristicvaluechanged", onNotification);
+    log("inf", "Keyless service ready, notifications on.");
+    setStatus("on", "Connected: " + name);
+    setButtons(true);
+    $("connectBtn").textContent = "Disconnect";
+  } catch (e) {
+    log("err", "Connection failed: " + e.message);
+    setStatus("", "Not connected");
+    try { device.gatt.disconnect(); } catch (x) {}
+  }
+};
+
+$("lockBtn").onclick   = () => queueWrite(buildFrame(CMD.lock, CMD_BYTE_KEYLESS), "LOCK");
+$("unlockBtn").onclick = () => queueWrite(buildFrame(CMD.unlock, CMD_BYTE_KEYLESS), "UNLOCK");
+$("trunkBtn").onclick  = () => queueWrite(buildFrame(CMD.trunk, CMD_BYTE_KEYLESS), "TRUNK");
+$("findBtn").onclick   = () => queueWrite(buildFrame(CMD.find, CMD_BYTE_KEYLESS), "FIND");
+
+log("inf", "Ready. Tap Connect scooter near your iQube.");
+</script>
+</body>
+</html>

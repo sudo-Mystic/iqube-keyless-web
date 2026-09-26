@@ -89,7 +89,42 @@
   </style>
 </head>
 <body>
-  <svg width="0" height="0" style="position:absolute"><defs>
+<div id="gate" hidden>
+  <div class="gate-card">
+    <h1>iQube Keyless</h1>
+    <p>Enter the access code to continue.</p>
+    <input id="gateInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Code" maxlength="12">
+    <button id="gateBtn" class="primary">Unlock</button>
+    <p id="gateErr" class="gate-err"></p>
+  </div>
+</div>
+<style>
+#gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+#gate[hidden]{display:none!important}
+.gate-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:30px 24px;text-align:center;box-shadow:var(--shadow)}
+.gate-card h1{margin:0 0 6px;font-size:22px}
+.gate-card p{color:var(--muted);font-size:14px;margin:0 0 16px}
+#gateInput{width:100%;font-size:22px;text-align:center;letter-spacing:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);color:var(--ink);margin-bottom:12px;outline:none}
+#gateBtn{width:100%;border:0;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+.gate-err{color:var(--danger)!important;min-height:20px;margin:10px 0 0!important;font-size:13px}
+</style>
+<script>
+(function(){
+  var gate=document.getElementById('gate');
+  var input=document.getElementById('gateInput');
+  var btn=document.getElementById('gateBtn');
+  var err=document.getElementById('gateErr');
+  try{if(sessionStorage.getItem('iqube_gate')==='ok'){gate.hidden=true;return;}}catch(e){}
+  gate.hidden=false;
+  function unlock(){
+    if(input.value==='1869'){try{sessionStorage.setItem('iqube_gate','ok');}catch(e){}gate.hidden=true;}
+    else{err.textContent='Wrong code. Try again.';input.value='';input.focus();}
+  }
+  btn.addEventListener('click',unlock);
+  input.addEventListener('keydown',function(e){if(e.key==='Enter')unlock();});
+  setTimeout(function(){input.focus();},150);
+})();
+</script>  <svg width="0" height="0" style="position:absolute"><defs>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.2 12 4l9 7.2V21h-6v-6H9v6H3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m11 12 8-8m-3 3 2 2m-5 1 2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
@@ -178,7 +213,23 @@
         <div class="live-log" id="liveLog"><div class="log-head"><strong>BLE packet log</strong><button type="button" id="clearLog">Clear</button></div><div class="packet-log" id="packetLog" role="log" aria-live="polite"><span class="sys">Waiting for a scooter connection.</span></div></div>
       </section>
 
-      <section class="view" id="view-locate"><div class="page-title"><h1>Locate & navigate</h1><p>Live location, last parked position and destination guidance become available once the scooter is paired.</p></div><div class="empty"><div><svg><use href="#i-pin"/></svg><h2>Vehicle location unavailable</h2><p>Pair your iQube to see its last reported location, open directions, save favourites and send turn-by-turn navigation to the cluster.</p><button class="primary" data-open="pair">Pair a scooter</button></div></div><div class="section-head"><div><h2>Navigation tools</h2></div></div><div class="feature-grid"><button class="feature" data-feature="parking"><span class="ico"><svg><use href="#i-pin"/></svg></span><span><h3>Last parked</h3><p>Find the scooter and open walking directions</p></span><span class="chev">›</span></button><button class="feature" data-feature="navigate"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Turn-by-turn</h3><p>Send directions to the connected dashboard</p></span><span class="chev">›</span></button><button class="feature" data-feature="places"><span class="ico"><svg><use href="#i-bolt"/></svg></span><span><h3>Nearby chargers</h3><p>Discover public charging points on your route</p></span><span class="chev">›</span></button></div></section>
+      <section class="view" id="view-locate"><div class="page-title"><h1>Locate & navigate</h1><p>Live location, last parked position and destination guidance become available once the scooter is paired.</p></div><div class="empty"><div><svg><use href="#i-pin"/></svg><h2>Vehicle location unavailable</h2><p>Pair your iQube to see its last reported location, open directions, save favourites and send turn-by-turn navigation to the cluster.</p><button class="primary" data-open="pair">Pair a scooter</button></div></div><div class="parked-card" id="lastParkedCard">
+      <span class="parked-ico"><svg><use href="#i-pin"/></svg></span>
+      <div class="parked-body">
+        <h3>Last parked</h3>
+        <p id="lastParkedText">No parked location saved yet.</p>
+        <a id="lastParkedDir" class="parked-dir" href="#" target="_blank" rel="noopener" hidden>Walking directions</a>
+      </div>
+    </div>
+    <style>
+    .parked-card{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:0 0 18px;box-shadow:var(--shadow)}
+    .parked-ico{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:14px;background:var(--surface-2);color:var(--accent)}
+    .parked-ico svg{width:24px;height:24px;fill:currentColor}
+    .parked-body h3{margin:2px 0 6px;font-size:16px}
+    .parked-body p{margin:0 0 10px;color:var(--muted);font-size:13.5px;line-height:1.5}
+    .parked-dir{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:14px;padding:10px 18px;border-radius:12px;text-decoration:none}
+    .parked-dir[hidden]{display:none}
+    </style><div class="section-head"><div><h2>Navigation tools</h2></div></div><div class="feature-grid"><button class="feature" data-feature="parking"><span class="ico"><svg><use href="#i-pin"/></svg></span><span><h3>Last parked</h3><p>Find the scooter and open walking directions</p></span><span class="chev">›</span></button><button class="feature" data-feature="navigate"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Turn-by-turn</h3><p>Send directions to the connected dashboard</p></span><span class="chev">›</span></button><button class="feature" data-feature="places"><span class="ico"><svg><use href="#i-bolt"/></svg></span><span><h3>Nearby chargers</h3><p>Discover public charging points on your route</p></span><span class="chev">›</span></button></div></section>
 
       <section class="view" id="view-rides"><div class="page-title"><h1>Rides</h1><p>Ride history, efficiency, distance, route replay and shareable trip summaries will appear here after the first sync.</p></div><div class="empty"><div><svg><use href="#i-route"/></svg><h2>No rides connected</h2><p>Pair your scooter to sync completed trips and see cumulative distance, riding time, average speed, energy use and regenerated energy.</p><button class="primary" data-open="pair">Connect ride history</button></div></div><div class="section-head"><div><h2>Ride features</h2></div></div><div class="feature-grid"><button class="feature" data-feature="trip"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Trip history</h3><p>Routes, time, speed and efficiency</p></span><span class="chev">›</span></button><button class="feature" data-feature="modes"><span class="ico"><svg><use href="#i-activity"/></svg></span><span><h3>Ride modes</h3><p>Review Eco and Power mode usage</p></span><span class="chev">›</span></button><button class="feature" data-feature="sharetrip"><span class="ico"><svg><use href="#i-doc"/></svg></span><span><h3>Trip moments</h3><p>Create and share a ride summary</p></span><span class="chev">›</span></button></div></section>
 
@@ -437,10 +488,36 @@
         if(/service/i.test(message))return 'The selected device does not expose the iQube keyless service. Choose your TVS scooter.';
         return message||'Bluetooth connection failed. Move closer to the scooter and try again.';
       }
+      function saveLastParked(){
+        if(!('geolocation' in navigator))return;
+        try{
+          navigator.geolocation.getCurrentPosition(function(pos){
+            var data={lat:pos.coords.latitude,lon:pos.coords.longitude,ts:Date.now()};
+            try{localStorage.setItem('iqube_last_parked',JSON.stringify(data));}catch(e){}
+            renderLastParked();
+            appendLog('sys','Last parked location saved');
+          },function(){},{timeout:9000,maximumAge:60000});
+        }catch(e){}
+      }
+      function renderLastParked(){
+        var text=document.getElementById('lastParkedText');
+        var dir=document.getElementById('lastParkedDir');
+        if(!text||!dir)return;
+        var raw=null;try{raw=localStorage.getItem('iqube_last_parked');}catch(e){}
+        if(!raw){text.textContent='No parked location saved yet. It is captured from your phone when the scooter disconnects.';dir.hidden=true;return;}
+        try{
+          var d=JSON.parse(raw);
+          var when=new Date(d.ts).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+          text.textContent=Number(d.lat).toFixed(5)+', '+Number(d.lon).toFixed(5)+'  |  '+when;
+          dir.href='https://www.google.com/maps/dir/?api=1&destination='+Number(d.lat).toFixed(5)+','+Number(d.lon).toFixed(5)+'&travelmode=walking';
+          dir.hidden=false;
+        }catch(e){text.textContent='Saved location could not be read.';dir.hidden=true;}
+      }
       function onDisconnected(){
         ready=false;gattServer=null;writeCharacteristic=null;notifyCharacteristic=null;
         setConnectionState('disconnected','Connection lost. Move closer and reconnect.','');
         appendLog('err','Disconnected from '+deviceName());
+        saveLastParked();
       }
       async function connectScooter(){
         if(!bluetoothAvailable){
@@ -589,6 +666,7 @@
         var initialUnavailable=unavailableBluetoothCopy(bluetoothSupportState.reason);
         setConnectionState('disconnected',initialUnavailable.detail,initialUnavailable.error);
       }
+      renderLastParked();
       setMode(mode);
     })();
   </script>

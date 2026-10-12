@@ -632,10 +632,14 @@
         var bytes=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
         var copy=new Uint8Array(bytes);
         appendLog('rx','RX '+bytesToHex(copy));
-        if(copy.length>=16){
+        // Challenge frames arrive as 0x9A 0xF2 followed by the 16 challenge
+        // bytes (dex-verified against the official app, whose BleEngine
+        // encrypts exactly those 16 bytes). Anything else is telemetry or
+        // status traffic: log it, never answer it.
+        if(copy.length>=18&&copy[0]===0x9a&&copy[1]===0xf2){
           appendLog('sys','Challenge received, answering authentication...');
-          cipherChallenge(copy.slice(0,16)).then(function(enc){
-            writeFrame(buildFrame(enc,0x50),'CHALLENGE-RESP');
+          cipherChallenge(copy.slice(2,18)).then(function(enc){
+            return writeFrame(buildFrame(enc,0x50),'CHALLENGE-RESP');
           }).catch(function(e){appendLog('err','Challenge answer failed: '+e.message);});
         }
       }

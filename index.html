@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <title>iQube Companion Webapp</title>
   <style>
     :root {
@@ -86,6 +88,36 @@
     @media(max-width:860px){.app{display:block}.rail{display:none}main{padding:16px 16px 102px}.topbar{margin-bottom:14px;align-items:flex-start;gap:10px}.vehicle-meta{padding-top:8px;min-width:0}.vehicle-meta span:last-child{overflow-wrap:anywhere}.hero{grid-template-columns:1fr;min-height:auto;padding:25px 22px 14px}.scooter-wrap{margin-top:4px;padding:0}.scooter-wrap img{max-height:225px}.stats{grid-template-columns:1fr 1fr}.controls{grid-template-columns:1fr 1fr}.feature-grid{grid-template-columns:1fr 1fr}.key-card{grid-template-columns:1fr;padding:20px}.lock-orb{max-width:240px}.safety-list,.more-list{grid-template-columns:1fr}.connection-panel{grid-template-columns:1fr}.connection-actions{width:100%}.connection-actions button{flex:1}.connection-error{grid-column:1}.bottom-nav{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:10px;right:10px;bottom:var(--safe-bottom);z-index:20;background:color-mix(in srgb,var(--surface) 94%,transparent);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:19px;padding:8px 4px;backdrop-filter:blur(18px)}.bottom-nav button{flex-direction:column;justify-content:center;gap:3px;font-size:10px;padding:5px 2px}.bottom-nav button svg{width:19px;height:19px}.bottom-nav button.active{color:var(--ink)}.toast{bottom:94px}}
     @media(max-width:520px){.hero{border-radius:24px}h1{font-size:38px}.hero-copy{font-size:14px}.signal{top:4%}.stat{padding:15px}.stat strong{font-size:20px}.controls{gap:9px}.control{min-height:125px;padding:15px}.feature-grid{grid-template-columns:1fr}.page-title h1{font-size:34px}.key-panel h2{font-size:26px}.section-head{margin-top:24px}.availability{display:none}}
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+    .ride-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+    .ride-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+    .ride-head h2{margin:0 0 6px;font-size:19px}
+    .ride-note{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;max-width:540px}
+    .ride-status{flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+    .ride-status.live{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+    .ride-map-wrap{position:relative;z-index:0;margin:16px 0;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2)}
+    #rideMap{height:300px;width:100%;background:var(--surface-2)}
+    #rideSvg{width:100%;height:220px;display:block;background:var(--surface-2)}
+    #rideSvg[hidden]{display:none}
+    .ride-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .ride-stat{background:var(--surface-2);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+    .ride-stat span{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+    .ride-stat label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .ride-error{margin:14px 0 0;background:#fdeceb;color:#8c2b26;border:1px solid #f3c1bd;border-radius:12px;padding:11px 13px;font-size:13.5px;line-height:1.45}
+    @media (prefers-color-scheme: dark){.ride-error{background:#3a2321;color:#ffb4ab;border-color:#5c3833}}
+    .ride-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+    .ride-ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);padding:12px 16px;border-radius:14px;font-weight:600;cursor:pointer}
+    .ride-totals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+    .ride-totals[hidden]{display:none}
+    .ride-totals .ride-stat{background:var(--surface);border:1px solid var(--line)}
+    .trip-row{display:flex;gap:10px;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:10px}
+    .trip-row.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+    .trip-main{flex:1;text-align:left;background:none;border:0;padding:4px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer;color:var(--ink);font:inherit;min-width:0}
+    .trip-main strong{font-size:15px}
+    .trip-main span{color:var(--muted);font-size:13px}
+    .trip-del{align-self:center;background:none;border:1px solid var(--line);color:var(--danger);border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+    .ride-empty{color:var(--muted);font-size:14px;margin:4px 2px 0}
+    .parked-body .parked-dist{color:var(--ink);font-weight:600}
+    .parked-refresh{margin:0;padding-left:0}
   </style>
 </head>
 <body>
@@ -219,6 +251,8 @@
         <h3>Last parked</h3>
         <p id="lastParkedText">No parked location saved yet.</p>
         <a id="lastParkedDir" class="parked-dir" href="#" target="_blank" rel="noopener" hidden>Walking directions</a>
+        <p id="lastParkedDist" class="parked-dist" hidden></p>
+        <button type="button" id="parkedDistBtn" class="text-btn parked-refresh" hidden>How far am I?</button>
       </div>
     </div>
     <style>
@@ -231,7 +265,7 @@
     .parked-dir[hidden]{display:none}
     </style><div class="section-head"><div><h2>Navigation tools</h2></div></div><div class="feature-grid"><button class="feature" data-feature="parking"><span class="ico"><svg><use href="#i-pin"/></svg></span><span><h3>Last parked</h3><p>Find the scooter and open walking directions</p></span><span class="chev">›</span></button><button class="feature" data-feature="navigate"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Turn-by-turn</h3><p>Send directions to the connected dashboard</p></span><span class="chev">›</span></button><button class="feature" data-feature="places"><span class="ico"><svg><use href="#i-bolt"/></svg></span><span><h3>Nearby chargers</h3><p>Discover public charging points on your route</p></span><span class="chev">›</span></button></div></section>
 
-      <section class="view" id="view-rides"><div class="page-title"><h1>Rides</h1><p>Ride history, efficiency, distance, route replay and shareable trip summaries will appear here after the first sync.</p></div><div class="empty"><div><svg><use href="#i-route"/></svg><h2>No rides connected</h2><p>Pair your scooter to sync completed trips and see cumulative distance, riding time, average speed, energy use and regenerated energy.</p><button class="primary" data-open="pair">Connect ride history</button></div></div><div class="section-head"><div><h2>Ride features</h2></div></div><div class="feature-grid"><button class="feature" data-feature="trip"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Trip history</h3><p>Routes, time, speed and efficiency</p></span><span class="chev">›</span></button><button class="feature" data-feature="modes"><span class="ico"><svg><use href="#i-activity"/></svg></span><span><h3>Ride modes</h3><p>Review Eco and Power mode usage</p></span><span class="chev">›</span></button><button class="feature" data-feature="sharetrip"><span class="ico"><svg><use href="#i-doc"/></svg></span><span><h3>Trip moments</h3><p>Create and share a ride summary</p></span><span class="chev">›</span></button></div></section>
+      <section class="view" id="view-rides"><div class="page-title"><h1>Rides</h1><p>Record rides with your phone GPS and keep your trip history on this device.</p></div><div class="ride-card"><div class="ride-head"><div><h2>Ride recorder</h2><p class="ride-note">Rides are recorded with your phone’s GPS, whether or not the scooter is connected. Trips are saved only in this browser and never uploaded.</p></div><span class="ride-status" id="rideStatus">Not recording</span></div><div class="ride-map-wrap" id="rideMapWrap"><div id="rideMap"></div><svg id="rideSvg" viewBox="0 0 100 60" preserveAspectRatio="none" hidden><polyline id="rideSvgLine" fill="none" stroke="#7fb800" stroke-width="1.4" points=""/></svg></div><div class="ride-stats"><div class="ride-stat"><span id="rideElapsed">0:00</span><label>Time</label></div><div class="ride-stat"><span id="rideDistance">0.00 km</span><label>Distance</label></div><div class="ride-stat"><span id="rideSpeed">0 km/h</span><label id="rideSpeedLabel">Speed now</label></div></div><p class="ride-error" id="rideError" hidden></p><div class="ride-actions"><button class="primary" id="rideToggle">Start ride</button><button class="ride-ghost" id="rideClearView" hidden>Back to live view</button></div></div><div class="section-head"><div><h2>Your trips</h2></div></div><div class="ride-totals" id="rideTotals" hidden><div class="ride-stat"><span id="totKm">0 km</span><label>Total distance</label></div><div class="ride-stat"><span id="totCount">0</span><label>Rides</label></div><div class="ride-stat"><span id="totTime">0 min</span><label>Total time</label></div></div><div id="tripList"></div><p class="ride-empty" id="tripEmpty">No trips recorded yet. Your finished rides will show up here.</p><div class="section-head"><div><h2>Ride features</h2></div></div><div class="feature-grid"><button class="feature" data-feature="trip"><span class="ico"><svg><use href="#i-route"/></svg></span><span><h3>Trip history</h3><p>Your recorded GPS rides and stats</p></span><span class="chev">›</span></button><button class="feature" data-feature="modes"><span class="ico"><svg><use href="#i-activity"/></svg></span><span><h3>Ride modes</h3><p>Review Eco and Power mode usage</p></span><span class="chev">›</span></button><button class="feature" data-feature="sharetrip"><span class="ico"><svg><use href="#i-doc"/></svg></span><span><h3>Trip moments</h3><p>Create and share a ride summary</p></span><span class="chev">›</span></button></div></section>
 
       <section class="view" id="view-charge"><div class="page-title"><h1>Charging</h1><p>Battery status, range prediction, charging sessions and home or portable charger controls in one view.</p></div><div class="empty"><div><svg><use href="#i-bolt"/></svg><h2>Charging data unavailable</h2><p>Pair your iQube to see battery level and range, monitor a session, review charging history and manage supported TVS chargers.</p><button class="primary" data-open="pair">Pair a scooter</button></div></div><div class="section-head"><div><h2>Charging tools</h2></div></div><div class="feature-grid"><button class="feature" data-feature="charge-status"><span class="ico"><svg><use href="#i-bolt"/></svg></span><span><h3>Live session</h3><p>Charge level, elapsed time and completion estimate</p></span><span class="chev">›</span></button><button class="feature" data-feature="charge-history"><span class="ico"><svg><use href="#i-activity"/></svg></span><span><h3>Charging history</h3><p>Sessions, energy added and summaries</p></span><span class="chev">›</span></button><button class="feature" data-feature="charger"><span class="ico"><svg><use href="#i-home"/></svg></span><span><h3>Home charger</h3><p>Status and controls for supported hardware</p></span><span class="chev">›</span></button></div></section>
 
@@ -393,6 +427,8 @@
         views.forEach(function(view){view.classList.toggle('active',view.id==='view-'+name)});
         document.querySelectorAll('.rail [data-view],.bottom-nav [data-view]').forEach(function(button){button.classList.toggle('active',button.dataset.view===name)});
         window.scrollTo({top:0,behavior:'smooth'});
+        if(name==='rides')onRidesViewShown();
+        if(name==='locate')updateParkedDistance();
       }
       function openModal(title,html){modalTitle.textContent=title;modalBody.innerHTML=html;dialog.showModal()}
       function deviceName(){return device?(device.name||'Selected Bluetooth device'):'Scooter'}
@@ -510,7 +546,7 @@
           var when=new Date(d.ts).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
           text.textContent=Number(d.lat).toFixed(5)+', '+Number(d.lon).toFixed(5)+'  |  '+when;
           dir.href='https://www.google.com/maps/dir/?api=1&destination='+Number(d.lat).toFixed(5)+','+Number(d.lon).toFixed(5)+'&travelmode=walking';
-          dir.hidden=false;
+          dir.hidden=false;var pdb=document.getElementById('parkedDistBtn');if(pdb)pdb.hidden=false;var pde=document.getElementById('lastParkedDist');if(pde){pde.hidden=true;pde.textContent='';}
         }catch(e){text.textContent='Saved location could not be read.';dir.hidden=true;}
       }
       function onDisconnected(){
@@ -628,16 +664,16 @@
         parking:['Last parked location','The scooter’s latest reported position appears after telematics is connected. No location is available in this demo.'],
         navigate:['Turn-by-turn navigation','Choose a destination in the connected app and send guidance to the iQube dashboard.'],
         places:['Nearby chargers','Public charging discovery requires live location and current station data, which this page does not fetch.'],
-        trip:['Trip history','Completed rides can include route, distance, time, speed and energy-efficiency summaries.'],
-        modes:['Ride modes','Review how Eco and Power modes were used across synced rides.'],
-        sharetrip:['Trip moments','Create a shareable summary from a synced ride. This page has no connected ride data.'],
+        trip:['Trip history','Rides you record with the phone GPS appear right here with route, distance, time and average speed. Trips are stored only in this browser.',''],
+        modes:['Ride modes','Eco and Power usage is reported by the scooter cluster, which this page does not read. GPS rides recorded here do not include mode data.'],
+        sharetrip:['Trip moments','Open any saved ride in the list above to see its route and stats on the map. Sending a summary out of the app is not built yet.',''],
         'charge-status':['Live charging session','A paired account can report battery level, range and charging progress.'],
         'charge-history':['Charging history','Synced sessions can show when and how the battery was charged.'],
         charger:['Home charger','Supported home and portable charger controls require verified hardware and account access.']
       };
       document.querySelectorAll('[data-feature]').forEach(function(button){button.addEventListener('click',function(){
         var copy=featureCopy[button.dataset.feature];
-        openModal(copy[0],'<p>'+copy[1]+'</p><p><strong style="color:var(--ink)">TVS account connection required.</strong> Live scooter mode currently controls the four nearby BLE keyless actions only.</p>');
+        openModal(copy[0],'<p>'+copy[1]+'</p>'+(copy.length>2?copy[2]:'<p><strong style="color:var(--ink)">TVS account connection required.</strong> Live scooter mode currently controls the four nearby BLE keyless actions only.</p>'));
       })});
       document.querySelectorAll('[data-keyless-command]').forEach(function(button){button.addEventListener('click',function(){sendKeylessCommand(button.dataset.keylessCommand)})});
 
@@ -660,6 +696,296 @@
       hold.addEventListener('keydown',function(event){if((event.key===' '||event.key==='Enter')&&!timer)beginHold(event)});
       hold.addEventListener('keyup',function(event){if((event.key===' '||event.key==='Enter')&&!holdCompleted)finishHold(false)});
 
+
+      /* Ride recorder: phone GPS trips, stored on this device only. */
+      var TRIPS_KEY='iqube.trips.v1';
+      var rideState={recording:false,watchId:null,timerId:null,startedAt:0,points:[],distanceM:0,topMs:0,lastSpeedMs:0,lastFixAt:0,finalElapsed:0};
+      var rideMap=null,rideLine=null,rideLiveMark=null,rideStartMark=null,rideEndMark=null;
+      var viewingTripId=null;
+
+      function haversineM(lat1,lon1,lat2,lon2){
+        var R=6371000,toRad=Math.PI/180;
+        var dLat=(lat2-lat1)*toRad,dLon=(lon2-lon1)*toRad;
+        var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        return 2*R*Math.asin(Math.sqrt(a));
+      }
+      function fmtDuration(s){
+        s=Math.max(0,Math.round(s));var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+        if(h>0)return h+':'+('0'+m).slice(-2)+':'+('0'+ss).slice(-2);
+        return m+':'+('0'+ss).slice(-2);
+      }
+      function fmtDurationLong(s){
+        s=Math.round(s);var h=Math.floor(s/3600),m=Math.round((s%3600)/60);
+        if(h>0)return h+' h '+m+' min';
+        return m+' min';
+      }
+      function loadTrips(){
+        try{var raw=localStorage.getItem(TRIPS_KEY);if(!raw)return [];var arr=JSON.parse(raw);return Array.isArray(arr)?arr:[];}catch(e){return [];}
+      }
+      function storeTrip(trip){
+        var trips=loadTrips();
+        trips.unshift(trip);
+        try{localStorage.setItem(TRIPS_KEY,JSON.stringify(trips));return;}
+        catch(e){
+          trips.pop();
+          try{localStorage.setItem(TRIPS_KEY,JSON.stringify(trips));notify('Storage was nearly full, so your oldest trip was removed to save this one.');return;}
+          catch(e2){notify('Could not save this trip. Browser storage is full.');}
+        }
+      }
+      function downsamplePoints(pts,max){
+        if(pts.length<=max)return pts.slice();
+        var step=pts.length/max,out=[],i;
+        for(i=0;i<max;i++)out.push(pts[Math.floor(i*step)]);
+        if(out[out.length-1]!==pts[pts.length-1])out.push(pts[pts.length-1]);
+        return out;
+      }
+      function leafletReady(){return typeof L!=='undefined'&&!!L.map;}
+      function ensureRideMap(){
+        var mapEl=document.getElementById('rideMap');
+        var svg=document.getElementById('rideSvg');
+        if(!mapEl||!svg)return;
+        if(leafletReady()){
+          try{
+            if(!rideMap){
+              rideMap=L.map('rideMap');
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'\u00a9 OpenStreetMap contributors'}).addTo(rideMap);
+              rideMap.setView([20.5937,78.9629],4);
+            }
+            mapEl.style.display='block';svg.hidden=true;return;
+          }catch(e){rideMap=null;}
+        }
+        mapEl.style.display='none';svg.hidden=false;
+      }
+      function clearMapMarks(){
+        [rideStartMark,rideEndMark,rideLiveMark].forEach(function(m){if(m&&rideMap)rideMap.removeLayer(m);});
+        rideStartMark=rideEndMark=rideLiveMark=null;
+      }
+      function drawRouteSvg(points){
+        var poly=document.getElementById('rideSvgLine');
+        if(!poly)return;
+        if(!points||points.length<2){poly.setAttribute('points','');return;}
+        var minLat=90,maxLat=-90,minLng=180,maxLng=-180,i;
+        for(i=0;i<points.length;i++){minLat=Math.min(minLat,points[i][0]);maxLat=Math.max(maxLat,points[i][0]);minLng=Math.min(minLng,points[i][1]);maxLng=Math.max(maxLng,points[i][1]);}
+        var latSpan=(maxLat-minLat)||0.001,lngSpan=(maxLng-minLng)||0.001,parts=[];
+        for(i=0;i<points.length;i++){
+          var x=4+((points[i][1]-minLng)/lngSpan)*92;
+          var y=56-((points[i][0]-minLat)/latSpan)*52;
+          parts.push(x.toFixed(1)+','+y.toFixed(1));
+        }
+        poly.setAttribute('points',parts.join(' '));
+      }
+      function showRouteOnMap(points,fit){
+        ensureRideMap();
+        if(leafletReady()&&rideMap){
+          if(rideLine){rideMap.removeLayer(rideLine);rideLine=null;}
+          clearMapMarks();
+          if(points&&points.length){
+            rideLine=L.polyline(points,{color:'#7fb800',weight:5}).addTo(rideMap);
+            rideStartMark=L.circleMarker(points[0],{radius:6,color:'#162018',weight:2,fillColor:'#c8f000',fillOpacity:1}).addTo(rideMap);
+            rideEndMark=L.circleMarker(points[points.length-1],{radius:6,color:'#162018',weight:2,fillColor:'#ff7b74',fillOpacity:1}).addTo(rideMap);
+            if(fit!==false){try{rideMap.fitBounds(rideLine.getBounds().pad(0.15));}catch(e){}}
+          }
+        }else{
+          drawRouteSvg(points||[]);
+        }
+      }
+      function updateLiveMap(){
+        var pts=rideState.points;
+        if(!pts.length)return;
+        var last=pts[pts.length-1];
+        if(leafletReady()){
+          ensureRideMap();
+          if(rideMap){
+            if(!rideLine){rideLine=L.polyline(pts,{color:'#7fb800',weight:5}).addTo(rideMap);}
+            else rideLine.setLatLngs(pts);
+            if(!rideLiveMark){rideLiveMark=L.circleMarker(last,{radius:7,color:'#162018',weight:2,fillColor:'#c8f000',fillOpacity:1}).addTo(rideMap);}
+            else rideLiveMark.setLatLng(last);
+            if(pts.length===1)rideMap.setView(last,16);
+            else if(!rideMap.getBounds().contains(last))rideMap.panTo(last);
+            return;
+          }
+        }
+        drawRouteSvg(pts);
+      }
+      function showRideError(msg){
+        var el=document.getElementById('rideError');
+        if(el){el.textContent=msg;el.hidden=false;}
+      }
+      function hideRideError(){
+        var el=document.getElementById('rideError');
+        if(el){el.hidden=true;el.textContent='';}
+      }
+      function updateRideReadouts(){
+        if(viewingTripId&&!rideState.recording)return;
+        var el=document.getElementById('rideElapsed');if(!el)return;
+        var elapsed=rideState.recording?(Date.now()-rideState.startedAt)/1000:(rideState.finalElapsed||0);
+        el.textContent=fmtDuration(elapsed);
+        document.getElementById('rideDistance').textContent=(rideState.distanceM/1000).toFixed(2)+' km';
+        document.getElementById('rideSpeed').textContent=Math.round(rideState.lastSpeedMs*3.6)+' km/h';
+      }
+      function showTripReadouts(t){
+        document.getElementById('rideElapsed').textContent=fmtDuration(t.durationS);
+        document.getElementById('rideDistance').textContent=(t.distanceM/1000).toFixed(2)+' km';
+        document.getElementById('rideSpeed').textContent=(t.avgKmh||0)+' km/h';
+        document.getElementById('rideSpeedLabel').textContent='Avg speed';
+        document.getElementById('rideStatus').textContent='Viewing saved ride';
+      }
+      function onRideFix(pos){
+        if(!rideState.recording)return;
+        var c=pos.coords;
+        if(c.accuracy&&c.accuracy>35)return;
+        var lat=c.latitude,lng=c.longitude,now=Date.now();
+        var pts=rideState.points;
+        var speedMs=(typeof c.speed==='number'&&!isNaN(c.speed))?c.speed:null;
+        if(pts.length){
+          var last=pts[pts.length-1];
+          var seg=haversineM(last[0],last[1],lat,lng);
+          var dt=(now-rideState.lastFixAt)/1000;
+          if(seg<5)return;
+          if(dt>0&&seg/dt>45)return;
+          rideState.distanceM+=seg;
+          if(speedMs===null&&dt>0)speedMs=seg/dt;
+        }
+        pts.push([lat,lng]);
+        rideState.lastFixAt=now;
+        if(speedMs!==null){rideState.lastSpeedMs=speedMs;if(speedMs>rideState.topMs)rideState.topMs=speedMs;}
+        hideRideError();
+        updateRideReadouts();
+        updateLiveMap();
+      }
+      function onRideGeoError(err){
+        var msg='Location is unavailable right now. Check that location is on, then try again.';
+        if(err&&err.code===1)msg='Location permission is off. Allow location access for this site in your browser settings, then start the ride again.';
+        else if(err&&err.code===3)msg='Location timed out. Head outdoors or wait for a clear GPS fix, then try again.';
+        showRideError(msg);
+        if(err&&err.code===1&&rideState.recording&&rideState.points.length===0)stopRide(true);
+      }
+      function startRide(){
+        hideRideError();
+        if(!('geolocation' in navigator)){showRideError('This browser does not provide location, so rides cannot be recorded.');return;}
+        viewingTripId=null;
+        document.getElementById('rideClearView').hidden=true;
+        document.getElementById('rideSpeedLabel').textContent='Speed now';
+        rideState={recording:true,watchId:null,timerId:null,startedAt:Date.now(),points:[],distanceM:0,topMs:0,lastSpeedMs:0,lastFixAt:0,finalElapsed:0};
+        ensureRideMap();
+        if(leafletReady()&&rideMap){if(rideLine){rideMap.removeLayer(rideLine);rideLine=null;}clearMapMarks();}
+        else drawRouteSvg([]);
+        rideState.watchId=navigator.geolocation.watchPosition(onRideFix,onRideGeoError,{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+        rideState.timerId=setInterval(updateRideReadouts,500);
+        document.getElementById('rideToggle').textContent='Stop ride';
+        var status=document.getElementById('rideStatus');status.textContent='Recording';status.classList.add('live');
+        updateRideReadouts();
+        renderTrips();
+        notify('Recording started. Keep this page open while you ride.');
+      }
+      function stopRide(discard){
+        if(rideState.watchId!==null&&rideState.watchId!==undefined){try{navigator.geolocation.clearWatch(rideState.watchId);}catch(e){}}
+        if(rideState.timerId){clearInterval(rideState.timerId);rideState.timerId=null;}
+        var durationS=Math.max(0,Math.round((Date.now()-rideState.startedAt)/1000));
+        var pts=rideState.points.slice();
+        var dist=rideState.distanceM;
+        var started=rideState.startedAt;
+        var topKmh=rideState.topMs*3.6;
+        rideState.recording=false;rideState.watchId=null;rideState.finalElapsed=durationS;
+        document.getElementById('rideToggle').textContent='Start ride';
+        var status=document.getElementById('rideStatus');status.textContent='Not recording';status.classList.remove('live');
+        if(discard){rideState.finalElapsed=0;updateRideReadouts();renderTrips();return;}
+        if(pts.length<2||dist<10){notify('Ride too short to save. Ride a little further next time.');updateRideReadouts();renderTrips();return;}
+        var trip={id:'t'+started,startedAt:started,endedAt:Date.now(),distanceM:Math.round(dist),durationS:durationS,avgKmh:durationS>0?Math.round(dist/durationS*3.6*10)/10:0,topKmh:Math.round(topKmh*10)/10,points:downsamplePoints(pts,1500)};
+        storeTrip(trip);
+        viewingTripId=trip.id;
+        showRouteOnMap(trip.points,true);
+        showTripReadouts(trip);
+        document.getElementById('rideClearView').hidden=false;
+        renderTrips();
+        notify('Ride saved: '+(dist/1000).toFixed(2)+' km in '+fmtDuration(durationS)+'.');
+      }
+      function renderTrips(){
+        var trips=loadTrips();
+        var list=document.getElementById('tripList');
+        var empty=document.getElementById('tripEmpty');
+        var totals=document.getElementById('rideTotals');
+        if(!list||!empty||!totals)return;
+        list.innerHTML='';
+        if(!trips.length){empty.hidden=false;totals.hidden=true;return;}
+        empty.hidden=true;totals.hidden=false;
+        var totalM=0,totalS=0,i;
+        for(i=0;i<trips.length;i++){totalM+=trips[i].distanceM||0;totalS+=trips[i].durationS||0;}
+        document.getElementById('totKm').textContent=(totalM/1000).toFixed(1)+' km';
+        document.getElementById('totCount').textContent=String(trips.length);
+        document.getElementById('totTime').textContent=fmtDurationLong(totalS);
+        trips.forEach(function(t){
+          var row=document.createElement('div');
+          row.className='trip-row'+(viewingTripId===t.id?' selected':'');
+          var when=new Date(t.startedAt).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+          var main=document.createElement('button');
+          main.type='button';main.className='trip-main';
+          main.innerHTML='<strong>'+escapeText(when)+'</strong><span>'+(t.distanceM/1000).toFixed(2)+' km \u00b7 '+fmtDuration(t.durationS)+' \u00b7 avg '+(t.avgKmh||0)+' km/h</span>';
+          main.addEventListener('click',function(){viewTrip(t.id);});
+          var del=document.createElement('button');
+          del.type='button';del.className='trip-del';del.textContent='Delete';del.setAttribute('aria-label','Delete trip from '+when);
+          del.addEventListener('click',function(){deleteTrip(t.id);});
+          row.appendChild(main);row.appendChild(del);list.appendChild(row);
+        });
+      }
+      function viewTrip(id){
+        if(rideState.recording){notify('Finish the current ride first to view a saved one.');return;}
+        var trips=loadTrips(),t=null,i;
+        for(i=0;i<trips.length;i++)if(trips[i].id===id)t=trips[i];
+        if(!t)return;
+        viewingTripId=id;
+        showRouteOnMap(t.points,true);
+        showTripReadouts(t);
+        document.getElementById('rideClearView').hidden=false;
+        renderTrips();
+        var wrap=document.getElementById('rideMapWrap');
+        if(wrap)wrap.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+      function deleteTrip(id){
+        var trips=loadTrips().filter(function(t){return t.id!==id;});
+        try{localStorage.setItem(TRIPS_KEY,JSON.stringify(trips));}catch(e){}
+        if(viewingTripId===id){viewingTripId=null;clearRideView();}
+        renderTrips();
+        notify('Trip deleted.');
+      }
+      function clearRideView(){
+        if(leafletReady()&&rideMap){if(rideLine){rideMap.removeLayer(rideLine);rideLine=null;}clearMapMarks();}
+        else drawRouteSvg([]);
+        document.getElementById('rideElapsed').textContent='0:00';
+        document.getElementById('rideDistance').textContent='0.00 km';
+        document.getElementById('rideSpeed').textContent='0 km/h';
+        document.getElementById('rideSpeedLabel').textContent='Speed now';
+        document.getElementById('rideStatus').textContent='Not recording';
+        document.getElementById('rideClearView').hidden=true;
+      }
+      function onRidesViewShown(){
+        ensureRideMap();
+        if(leafletReady()&&rideMap){setTimeout(function(){try{rideMap.invalidateSize();}catch(e){}},80);}
+        renderTrips();
+      }
+      function updateParkedDistance(){
+        var distEl=document.getElementById('lastParkedDist');
+        if(!distEl)return;
+        var raw=null;try{raw=localStorage.getItem('iqube_last_parked');}catch(e){}
+        if(!raw){distEl.hidden=true;return;}
+        var d;try{d=JSON.parse(raw);}catch(e){distEl.hidden=true;return;}
+        if(!('geolocation' in navigator)){distEl.hidden=true;return;}
+        navigator.geolocation.getCurrentPosition(function(pos){
+          var m=haversineM(pos.coords.latitude,pos.coords.longitude,Number(d.lat),Number(d.lon));
+          distEl.textContent=(m<1000?'About '+(Math.round(m/10)*10)+' m from you':'About '+(m/1000).toFixed(1)+' km from you');
+          distEl.hidden=false;
+        },function(){distEl.hidden=true;},{timeout:9000,maximumAge:30000});
+      }
+      function initRides(){
+        var toggle=document.getElementById('rideToggle');
+        if(toggle)toggle.addEventListener('click',function(){if(rideState.recording)stopRide(false);else startRide();});
+        var clearBtn=document.getElementById('rideClearView');
+        if(clearBtn)clearBtn.addEventListener('click',function(){viewingTripId=null;clearRideView();renderTrips();});
+        var pdb=document.getElementById('parkedDistBtn');
+        if(pdb)pdb.addEventListener('click',updateParkedDistance);
+        renderTrips();
+      }
+
       if(bluetoothAvailable){
         setConnectionState('disconnected','Choose your nearby iQube from the Android Bluetooth picker.','');
       }else{
@@ -667,6 +993,7 @@
         setConnectionState('disconnected',initialUnavailable.detail,initialUnavailable.error);
       }
       renderLastParked();
+      initRides();
       setMode(mode);
     })();
   </script>

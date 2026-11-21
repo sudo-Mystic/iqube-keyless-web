@@ -335,7 +335,7 @@
       var mode=bluetoothAvailable?'live':'demo';
       var device=null,gattServer=null,writeCharacteristic=null,notifyCharacteristic=null,ready=false;
       var connectionStatus='disconnected',writeQueue=Promise.resolve();
-      var unlocked=false,timer=null,holdStart=0,holdCompleted=false;
+      var demoUnlocked=false,lastLockCommand=null,timer=null,holdStart=0,holdCompleted=false;
 
       var views=document.querySelectorAll('.view');
       var navs=document.querySelectorAll('[data-view]');
@@ -435,6 +435,7 @@
 
       function setConnectionState(state,detail,error){
         connectionStatus=state;
+        if(state==='disconnected')lastLockCommand=null;
         connectionState.textContent=state.charAt(0).toUpperCase()+state.slice(1);
         connectionDetail.textContent=detail||'';
         connectionError.textContent=error||'';
@@ -443,24 +444,36 @@
         if(mode==='live'){
           topStatusText.textContent=state==='connected'?deviceName()+' connected':state.charAt(0).toUpperCase()+state.slice(1);
           heroSignal.textContent=state.toUpperCase();
-          railFooter.innerHTML=state==='connected'?escapeText(deviceName())+'<br>Keyless service ready':'Scooter '+state+'<br>Connect nearby over Bluetooth';
+          railFooter.innerHTML=state==='connected'?escapeText(deviceName())+'<br>Bluetooth connected':'Scooter '+state+'<br>Connect nearby over Bluetooth';
+          quickControlsCopy.textContent=ready?'Bluetooth connected · Scooter lock state unknown':'Connect first to send a live keyless command';
         }
         disconnectBtn.hidden=state!=='connected'&&state!=='connecting';
-        updateCommandAvailability();
+        updateLockUi();
       }
       function escapeText(value){var span=document.createElement('span');span.textContent=value;return span.innerHTML}
+      function holdCommand(){
+        var shouldLock=mode==='demo'?demoUnlocked:lastLockCommand==='unlock';
+        return shouldLock?'lock':'unlock';
+      }
       function updateCommandAvailability(){
         var enabled=mode==='demo'||ready;
         document.querySelectorAll('[data-keyless-command]').forEach(function(button){button.disabled=!enabled});
         hold.disabled=!enabled;
         if(!enabled)hold.querySelector('span').textContent='Connect to continue';
-        else hold.querySelector('span').textContent=unlocked?'Hold to lock':'Hold to unlock';
+        else hold.querySelector('span').textContent='Hold to '+holdCommand();
       }
-      function updateLockUi(message){
-        orb.classList.toggle('unlocked',unlocked);
-        lockIcon.innerHTML='<use href="'+(unlocked?'#i-unlock':'#i-lock')+'"/>';
-        lockMeta.textContent=message||(unlocked?'Last command: unlock':'Last command: lock');
-        lockTitle.textContent=mode==='demo'?(unlocked?'Unlocked in demo':'Locked in demo'):(unlocked?'Unlock command sent':'Lock command sent');
+      function updateLockUi(){
+        var inDemo=mode==='demo';
+        orb.classList.toggle('unlocked',inDemo&&demoUnlocked);
+        var icon=inDemo?(demoUnlocked?'#i-unlock':'#i-lock'):'#i-key';
+        lockIcon.innerHTML='<use href="'+icon+'"/>';
+        if(inDemo){
+          lockTitle.textContent=demoUnlocked?'Unlocked in demo':'Locked in demo';
+          lockMeta.textContent='Demo scooter';
+        }else{
+          lockTitle.textContent='Scooter lock state unknown';
+          lockMeta.textContent=lastLockCommand?'Last Bluetooth request: '+LABELS[lastLockCommand]:'No lock or unlock request sent';
+        }
         updateCommandAvailability();
       }
       function setMode(nextMode){
@@ -475,12 +488,10 @@
         keyModePill.textContent=mode==='live'?'LIVE':'DEMO';
         if(mode==='live'){
           heroCopy.textContent='Connect to your nearby scooter over Bluetooth for real keyless commands. Other dashboard areas remain a demo until TVS account services are connected.';
-          quickControlsCopy.textContent=ready?'Connected and ready for live commands':'Connect first to send a live keyless command';
-          keyPageCopy.textContent='Connect to your nearby scooter, then hold to send an authenticated lock or unlock command over Bluetooth.';
-          keyInstructions.textContent='Press and hold to send a secure keyless command. Chrome may show a system pairing prompt before the first command.';
+          keyPageCopy.textContent='Connect to your nearby scooter to send a lock or unlock request over Bluetooth.';
+          keyInstructions.textContent='Press and hold to send a request. Check the scooter directly to confirm its lock state.';
           keyCallout.innerHTML='<strong>Live mode uses Web Bluetooth.</strong> Keep the scooter nearby and unlocked for pairing. Only keyless controls use the live connection.';
-          setConnectionState(connectionStatus,ready?deviceName()+' keyless service is ready.':'Choose your nearby iQube from the Android Bluetooth picker.',connectionError.textContent);
-          updateLockUi(ready?'Connected to '+deviceName():'Scooter state unknown');
+          setConnectionState(connectionStatus,connectionDetail.textContent,connectionError.textContent);
         }else{
           topStatusDot.className='dot';
           topStatusText.textContent='Demo vehicle · Not connected';
@@ -491,9 +502,8 @@
           keyInstructions.textContent='Press and hold to preview the selected keyless command on screen.';
           keyCallout.innerHTML='<strong>Demo mode is on.</strong> Commands change only this page and are not sent to a scooter.';
           railFooter.innerHTML='No live commands<br>Controls stay in demo mode';
-          updateLockUi(unlocked?'Scooter unlocked in demo':'Scooter locked in demo');
+          updateLockUi();
         }
-        updateCommandAvailability();
       }
 
       function unavailableBluetoothCopy(reason){
@@ -578,10 +588,8 @@
           notifyCharacteristic.addEventListener('characteristicvaluechanged',onNotification);
           await notifyCharacteristic.startNotifications();
           ready=true;
-          setConnectionState('connected',deviceName()+' keyless service is ready.','');
+          setConnectionState('connected','Bluetooth connected to '+deviceName()+'. Scooter lock state is unconfirmed.','');
           appendLog('sys','Connected. Notifications enabled');
-          quickControlsCopy.textContent='Connected and ready for live commands';
-          updateLockUi('Connected. Scooter state unknown');
           notify('Connected to '+deviceName());
         }catch(error){
           ready=false;writeCharacteristic=null;notifyCharacteristic=null;
@@ -608,20 +616,22 @@
       }
       async function sendKeylessCommand(name){
         if(mode==='demo'){
-          if(name==='unlock')unlocked=true;
-          if(name==='lock')unlocked=false;
-          updateLockUi(unlocked?'Scooter unlocked in demo':'Scooter locked in demo');
+          if(name==='unlock')demoUnlocked=true;
+          if(name==='lock')demoUnlocked=false;
+          updateLockUi();
           var demoMessages={unlock:'Unlocked on screen only.',lock:'Locked on screen only.',seat:'Seat opened on screen only.',find:'Find-scooter lights and sound activated on screen only.'};
           notify(demoMessages[name]);return true;
         }
         if(!ready){notify('Connect the scooter before sending a command.');showView('key');return false}
+        var commandTarget=writeCharacteristic;
         try{
           var frame=buildFrame(COMMANDS[name],0x40);
           await writeFrame(frame,LABELS[name]);
-          if(name==='unlock')unlocked=true;
-          if(name==='lock')unlocked=false;
-          if(name==='unlock'||name==='lock')updateLockUi('Last command: '+LABELS[name]);
-          notify(LABELS[name]+' command sent');
+          if(ready&&writeCharacteristic===commandTarget&&(name==='unlock'||name==='lock')){
+            lastLockCommand=name;
+            updateLockUi();
+          }
+          notify(LABELS[name]+' request sent over Bluetooth. Scooter response unconfirmed.');
           return true;
         }catch(error){
           var friendly=normalizeBleError(error);connectionError.textContent=friendly;appendLog('err',friendly);notify(friendly);return false;
@@ -693,7 +703,7 @@
       function finishHold(completed){
         if(timer){clearInterval(timer);timer=null}
         hold.style.setProperty('--hold','0%');
-        if(completed)sendKeylessCommand(unlocked?'lock':'unlock');
+        if(completed)sendKeylessCommand(holdCommand());
       }
       hold.addEventListener('pointerdown',beginHold);
       ['pointerup','pointerleave','pointercancel'].forEach(function(eventName){hold.addEventListener(eventName,function(){if(!holdCompleted)finishHold(false)})});
@@ -724,7 +734,15 @@
         return m+' min';
       }
       function loadTrips(){
-        try{var raw=localStorage.getItem(TRIPS_KEY);if(!raw)return [];var arr=JSON.parse(raw);return Array.isArray(arr)?arr:[];}catch(e){return [];}
+        try{
+          var trips=JSON.parse(localStorage.getItem(TRIPS_KEY));
+          if(!Array.isArray(trips))return [];
+          return trips.filter(function(trip){
+            return trip&&typeof trip.id==='string'&&Number.isFinite(trip.startedAt)&&
+              Number.isFinite(trip.distanceM)&&Number.isFinite(trip.durationS)&&
+              (trip.avgKmh==null||Number.isFinite(trip.avgKmh))&&Array.isArray(trip.points);
+          });
+        }catch(e){return [];}
       }
       function storeTrip(trip){
         var trips=loadTrips();
